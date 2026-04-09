@@ -1,0 +1,7 @@
+{
+  "name": "emotion-study-assistant",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve ."
+  }
+}

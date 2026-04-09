@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emotion-Based Study Assistant</title>
+  <meta name="description" content="C++ OpenCV project — real-time face detection with emotion-based study suggestions." />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --card: #111827;
+      --code: #1e293b;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --dim: #94a3b8;
+      --accent: #38bdf8;
+      --green: #4ade80;
+      --orange: #fb923c;
+      --red: #f87171;
+      --purple: #a78bfa;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+    /* Header */
+    .header { text-align:center; padding:40px 24px 20px; }
+    .header h1 { font-size:1.8rem; font-weight:700; background:linear-gradient(135deg,var(--accent),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px; }
+    .header p { color:var(--dim); font-size:0.9rem; }
+
+    .container { max-width:960px; margin:0 auto; padding:0 20px 60px; }
+    .section-title { font-size:0.7rem; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin:32px 0 16px; font-weight:600; }
+
+    /* Demo */
+    .demo-box { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .demo-top { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px; }
+    .demo-top h3 { font-size:0.95rem; display:flex; align-items:center; gap:8px; }
+    .live-dot { width:8px; height:8px; background:var(--red); border-radius:50%; animation:pulse 1.5s infinite; display:inline-block; }
+    .live-dot.on { background:var(--green); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .demo-btns { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .btn { font-family:'JetBrains Mono',monospace; font-size:.78rem; padding:7px 16px; border:1px solid var(--border); border-radius:7px; cursor:pointer; background:var(--code); color:var(--text); transition:.2s; }
+    .btn:hover { border-color:var(--accent); }
+    .btn-go { background:var(--accent); color:#0a0e17; border-color:var(--accent); font-weight:600; }
+    .btn-go:hover { opacity:.9; }
+
+    /* Dropdown */
+    select.mode-select { font-family:'JetBrains Mono',monospace; font-size:.78rem; padding:7px 12px; border:1px solid var(--purple); border-radius:7px; background:var(--code); color:var(--purple); cursor:pointer; outline:none; }
+    select.mode-select:hover { border-color:var(--accent); }
+    select.lang-select { font-family:'JetBrains Mono',monospace; font-size:.78rem; padding:7px 12px; border:1px solid var(--orange); border-radius:7px; background:var(--code); color:var(--orange); cursor:pointer; outline:none; }
+
+    .demo-grid { display:grid; grid-template-columns:1fr 300px; min-height:380px; }
+    .vid-wrap { position:relative; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .vid-wrap video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+    .vid-wrap canvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+    .placeholder { text-align:center; color:var(--dim); padding:40px; }
+    .placeholder .ico { font-size:2.5rem; margin-bottom:10px; }
+    .warn { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(248,113,113,.15); border:1px solid var(--red); border-radius:10px; padding:14px 24px; color:var(--red); font-weight:600; font-size:.9rem; display:none; backdrop-filter:blur(4px); }
+    .beep { position:absolute; top:10px; right:10px; background:rgba(248,113,113,.9); color:#fff; padding:7px 14px; border-radius:8px; font-weight:700; font-family:'JetBrains Mono',monospace; font-size:.8rem; display:none; z-index:10; }
+
+    /* Song recommendation */
+    .song-box { position:absolute; bottom:10px; left:10px; right:10px; background:rgba(17,24,39,.95); border:2px solid var(--green); border-radius:10px; padding:14px 16px; display:none; z-index:20; backdrop-filter:blur(6px); }
+    .song-box .song-title { font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:6px; }
+    .song-box .song-name { color:var(--green); font-size:.9rem; font-weight:600; margin-bottom:6px; }
+    .song-box .song-link { display:inline-block; background:var(--red); color:#fff; padding:6px 14px; border-radius:6px; font-size:.8rem; font-weight:600; text-decoration:none; font-family:'JetBrains Mono',monospace; transition:.2s; }
+    .song-box .song-link:hover { opacity:.8; }
+    /* Song popup outside video for mobile */
+    .song-popup { display:none; background:var(--card); border:2px solid var(--green); border-radius:12px; padding:16px 20px; margin-top:12px; text-align:center; }
+    .song-popup .song-title { font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:8px; }
+    .song-popup .song-name { color:var(--green); font-size:1rem; font-weight:600; margin-bottom:8px; }
+    .song-popup .song-link { display:inline-block; background:#ff0000; color:#fff; padding:8px 20px; border-radius:8px; font-size:.85rem; font-weight:600; text-decoration:none; font-family:'JetBrains Mono',monospace; transition:.2s; }
+    .song-popup .song-link:hover { opacity:.8; }
+
+    .sidebar { border-left:1px solid var(--border); padding:16px; display:flex; flex-direction:column; gap:12px; background:var(--card); overflow-y:auto; }
+    .stat { background:var(--code); border-radius:8px; padding:12px; }
+    .stat-lbl { font-size:.65rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin-bottom:4px; }
+    .stat-val { font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700; }
+    .stat-val.emo { color:var(--orange); }
+    .stat-val.sc { color:var(--green); }
+    .stat-val.tm { color:var(--accent); }
+    .stat-val.md { color:var(--purple); }
+    .stat-val.rd { color:var(--red); }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .sug-box { background:var(--code); border-radius:8px; padding:12px; flex:1; }
+    .sug-text { color:var(--green); font-size:.85rem; line-height:1.5; }
+    .emo-log { list-style:none; padding:0; margin-top:6px; max-height:80px; overflow-y:auto; font-size:.7rem; font-family:'JetBrains Mono',monospace; }
+    .emo-log li { padding:2px 0; color:var(--dim); border-bottom:1px solid rgba(255,255,255,.04); }
+
+    /* Summary modal */
+    .modal-bg { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
+    .modal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px; max-width:400px; width:90%; text-align:center; }
+    .modal h2 { color:var(--accent); margin-bottom:4px; }
+    .modal .sub { color:var(--dim); font-size:.8rem; margin-bottom:16px; }
+
+    /* Team */
+    .team-section { margin-top:40px; }
+    .team-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+    .team-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px 16px; text-align:center; transition:.2s; }
+    .team-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+    .team-avatar { width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--purple)); display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:1.2rem; font-weight:700; color:#0a0e17; }
+    .team-name { font-size:.9rem; font-weight:600; }
+    .team-role { font-size:.7rem; color:var(--dim); margin-top:2px; }
+
+    .song-countdown { font-size:.7rem; color:var(--dim); margin-top:8px; font-family:'JetBrains Mono',monospace; }
+    .song-countdown span { color:var(--accent); font-weight:700; }
+    .footer { text-align:center; padding:28px 20px; color:var(--dim); font-size:.75rem; border-top:1px solid var(--border); margin-top:40px; }
+
+    @media(max-width:768px) {
+      .demo-grid { grid-template-columns:1fr; }
+      .sidebar { border-left:none; border-top:1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="header">
+    <h1>🎓 Emotion-Based Study Assistant</h1>
+    <p>C++ &amp; OpenCV Project — Real-time face detection with study suggestions</p>
+  </section>
+
+  <div class="container">
+
+    <!-- ===== LIVE DEMO ===== -->
+    <p class="section-title">Live Web Demo</p>
+    <div class="demo-box">
+      <div class="demo-top">
+        <h3><span class="live-dot" id="liveDot"></span> Webcam Feed <span id="loadStatus" style="font-size:.7rem;color:var(--dim);font-weight:normal;margin-left:6px;"></span></h3>
+        <div class="demo-btns">
+          <select class="lang-select" id="langSelect">
+            <option value="english">🎵 English Songs</option>
+            <option value="tamil">🎵 Tamil Songs</option>
+            <option value="telugu">🎵 Telugu Songs</option>
+            <option value="malayalam">🎵 Malayalam Songs</option>
+          </select>
+          <select class="mode-select" id="modeSelect" onchange="changeMode()">
+            <option value="Relaxed">😌 Relaxed Mode</option>
+            <option value="Strict">🔥 Strict Mode</option>
+          </select>
+          <button class="btn btn-go" id="btnStart" onclick="startCamera()">▶ Start Camera</button>
+          <button class="btn" id="btnStop" onclick="stopCamera()" style="display:none;">⏹ Stop</button>
+        </div>
+      </div>
+      <div class="demo-grid">
+        <div class="vid-wrap" id="vidWrap">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="placeholder" id="placeholder">
+            <div class="ico">📷</div>
+            <p>Click <strong>Start Camera</strong> to begin</p>
+            <p style="font-size:.75rem;margin-top:6px;">Your webcam stays in your browser — nothing uploaded.</p>
+          </div>
+          <div class="warn" id="warnBox">⚠ WARNING: User not present!</div>
+          <div class="beep" id="beepBox">🔔 BEEP!</div>
+          <!-- Song recommendation overlay -->
+          <div class="song-box" id="songBox">
+            <div class="song-title">🎵 Feeling down? Listen to this!</div>
+            <div class="song-name" id="songName"></div>
+            <a class="song-link" id="songLink" href="#" target="_blank" rel="noopener">▶ Play on YouTube</a>
+          </div>
+        </div>
+        <div class="sidebar">
+          <div class="stat">
+            <div class="stat-lbl">Detected Emotion</div>
+            <div class="stat-val emo" id="emoDisp">—</div>
+            <div style="font-size:.65rem;color:var(--dim);margin-top:3px;" id="confDisp"></div>
+          </div>
+          <div class="row2">
+            <div class="stat">
+              <div class="stat-lbl">Focused</div>
+              <div class="stat-val sc" id="focDisp">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Distracted</div>
+              <div class="stat-val rd" id="disDisp">0</div>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl">Productivity Score</div>
+            <div class="stat-val sc" id="scoreDisp">0.0%</div>
+          </div>
+          <div class="row2">
+            <div class="stat">
+              <div class="stat-lbl">Study Time</div>
+              <div class="stat-val tm" id="timeDisp">0s</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Mode</div>
+              <div class="stat-val md" id="modeDisp">Relaxed</div>
+            </div>
+          </div>
+          <div class="sug-box">
+            <div class="stat-lbl">💡 Study Suggestion</div>
+            <div class="sug-text" id="sugDisp">Start the camera to get tips!</div>
+            <div class="stat-lbl" style="margin-top:10px;">📋 Emotion Log</div>
+            <ul class="emo-log" id="emoLog"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Song Popup (outside video, always visible) -->
+    <div class="song-popup" id="songPopup">
+      <div class="song-title">🎵 You look stressed! Here's a song to cheer you up</div>
+      <div class="song-name" id="songPopupName"></div>
+      <a class="song-link" id="songPopupLink" href="#" target="_blank" rel="noopener">▶ Play on YouTube</a>
+      <div class="song-countdown" id="songCountdown">Disappears in <span id="countSec">10</span>s</div>
+    </div>
+
+    <div class="modal-bg" id="summaryModal">
+      <div class="modal">
+        <h2>📊 Session Summary</h2>
+        <p class="sub">Here's how your study session went</p>
+        <div id="summaryBody"></div>
+        <button class="btn btn-go" onclick="closeSummary()" style="margin-top:16px;width:100%;">Close</button>
+      </div>
+    </div>
+
+    <!-- ===== SYSTEM ARCHITECTURE ===== -->
+    <div class="team-section">
+      <p class="section-title">System Architecture</p>
+      <div class="demo-box" style="padding:24px;">
+        <!-- Flow diagram using simple HTML/CSS -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+          <div style="background:var(--code);border:1px solid var(--border);padding:12px 18px;border-radius:10px;text-align:center;">
+            <div style="font-size:1.3rem;">📷</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:4px;">Webcam</div>
+            <div style="font-size:.65rem;color:var(--dim);">cv::VideoCapture</div>
+          </div>
+          <div style="color:var(--accent);font-size:1.3rem;">→</div>
+          <div style="background:var(--code);border:1px solid var(--border);padding:12px 18px;border-radius:10px;text-align:center;">
+            <div style="font-size:1.3rem;">🔍</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:4px;">Face Detect</div>
+            <div style="font-size:.65rem;color:var(--dim);">Haar Cascade</div>
+          </div>
+          <div style="color:var(--accent);font-size:1.3rem;">→</div>
+          <div style="background:var(--code);border:1px solid var(--border);padding:12px 18px;border-radius:10px;text-align:center;">
+            <div style="font-size:1.3rem;">😊</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:4px;">Emotion Sim</div>
+            <div style="font-size:.65rem;color:var(--dim);">Random Engine</div>
+          </div>
+          <div style="color:var(--accent);font-size:1.3rem;">→</div>
+          <div style="background:var(--code);border:1px solid var(--border);padding:12px 18px;border-radius:10px;text-align:center;">
+            <div style="font-size:1.3rem;">🧠</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:4px;">Decisions</div>
+            <div style="font-size:.65rem;color:var(--dim);">Study Tips</div>
+          </div>
+          <div style="color:var(--accent);font-size:1.3rem;">→</div>
+          <div style="background:var(--code);border:1px solid var(--border);padding:12px 18px;border-radius:10px;text-align:center;">
+            <div style="font-size:1.3rem;">📊</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:4px;">Tracker</div>
+            <div style="font-size:.65rem;color:var(--dim);">Score + Log</div>
+          </div>
+        </div>
+        <p style="color:var(--dim);font-size:.8rem;text-align:center;">The webcam captures frames → faces are detected using Haar Cascade → emotions are simulated → study suggestions are generated → productivity is tracked and logged.</p>
+      </div>
+    </div>
+
+    <!-- ===== PROJECT FILES ===== -->
+    <div class="team-section">
+      <p class="section-title">C++ Project Files</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
+        <div class="demo-box" style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);margin-bottom:6px;">main.cpp</div>
+          <p style="font-size:.8rem;color:var(--dim);">Entry point of the program. Opens webcam, runs the main loop, handles keyboard input (q to quit, m to toggle mode), and coordinates all other modules.</p>
+        </div>
+        <div class="demo-box" style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);margin-bottom:6px;">face_detection.h / .cpp</div>
+          <p style="font-size:.8rem;color:var(--dim);">FaceDetector class — loads the Haar Cascade XML file and uses it to find faces in each video frame. Draws green rectangles around detected faces.</p>
+        </div>
+        <div class="demo-box" style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);margin-bottom:6px;">emotion_simulator.h / .cpp</div>
+          <p style="font-size:.8rem;color:var(--dim);">EmotionSimulator class — uses rand() to pick a random emotion (Happy, Sad, Angry, Neutral, Sleepy) every ~2 seconds to simulate real detection.</p>
+        </div>
+        <div class="demo-box" style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);margin-bottom:6px;">decision_engine.h / .cpp</div>
+          <p style="font-size:.8rem;color:var(--dim);">DecisionEngine class — takes an emotion and returns a study suggestion. Supports Strict mode (strong warnings) and Relaxed mode (gentle tips).</p>
+        </div>
+        <div class="demo-box" style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);margin-bottom:6px;">productivity_tracker.h / .cpp</div>
+          <p style="font-size:.8rem;color:var(--dim);">ProductivityTracker class — tracks focused vs distracted count, calculates productivity score, manages the study timer, prints BEEP alerts, and logs emotions to log.txt.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TEAM ===== -->
+    <div class="team-section">
+      <p class="section-title">Team Members</p>
+      <div class="team-grid">
+        <div class="team-card">
+          <div class="team-avatar">D</div>
+          <div class="team-name">Dharoon Balajii</div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">M</div>
+          <div class="team-name">Mukillesh</div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">K</div>
+          <div class="team-name">Karthik</div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">T</div>
+          <div class="team-name">Tharakesh</div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">J</div>
+          <div class="team-name">Jaishwa</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Built with C++ &bull; OpenCV &bull; Haar Cascade<br/>
+      Web demo uses face-api.js for browser preview
+    </div>
+  </div>
+
+  <!-- face-api.js -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <script>
+    /* ==========================================
+       SONG DATABASE (Happy songs for each language)
+       ========================================== */
+    var songs = {
+      english: [
+        { name: "NCS - Alan Walker - Fade", url: "https://www.youtube.com/watch?v=bM7SZ5SBzyY" },
+        { name: "NCS - Tobu - Candyland", url: "https://www.youtube.com/watch?v=IIrCDAV3EgI" },
+        { name: "NCS - Elektronomia - Sky High", url: "https://www.youtube.com/watch?v=TW9d8vYrVFQ" },
+        { name: "NCS - TheFatRat - Unity", url: "https://www.youtube.com/watch?v=n8X9_MgEdCg" },
+        { name: "NCS - Cartoon - On & On", url: "https://www.youtube.com/watch?v=K4DyBUG242c" },
+        { name: "NCS - Tobu - Hope", url: "https://www.youtube.com/watch?v=EP625xQIGzs" },
+        { name: "NCS - Jim Yosef - Firefly", url: "https://www.youtube.com/watch?v=x_OwcYTNbHs" }
+      ],
+      tamil: [
+        { name: "NCS - Elektronomia - Sky High", url: "https://www.youtube.com/watch?v=TW9d8vYrVFQ" },
+        { name: "NCS - Tobu - Candyland", url: "https://www.youtube.com/watch?v=IIrCDAV3EgI" },
+        { name: "NCS - Tobu - Hope", url: "https://www.youtube.com/watch?v=EP625xQIGzs" },
+        { name: "NCS - Jim Yosef - Firefly", url: "https://www.youtube.com/watch?v=x_OwcYTNbHs" },
+        { name: "NCS - Alan Walker - Fade", url: "https://www.youtube.com/watch?v=bM7SZ5SBzyY" },
+        { name: "NCS - Cartoon - On & On", url: "https://www.youtube.com/watch?v=K4DyBUG242c" },
+        { name: "NCS - Syn Cole - Feel Good", url: "https://www.youtube.com/watch?v=q1ULJ92aldE" }
+      ],
+      telugu: [
+        { name: "NCS - Tobu - Colors", url: "https://www.youtube.com/watch?v=eyLml-zzXzw" },
+        { name: "NCS - Elektronomia - Energy", url: "https://www.youtube.com/watch?v=wbRPJvYp3ag" },
+        { name: "NCS - JPB - High", url: "https://www.youtube.com/watch?v=Tv6WImqSuxA" },
+        { name: "NCS - Tobu - Infectious", url: "https://www.youtube.com/watch?v=ux8-EbW6DUI" },
+        { name: "NCS - Disfigure - Blank", url: "https://www.youtube.com/watch?v=p7ZsBPK656s" },
+        { name: "NCS - Defqwop - Heart Afire", url: "https://www.youtube.com/watch?v=qYot9Shfees" },
+        { name: "NCS - Itro & Tobu - Cloud 9", url: "https://www.youtube.com/watch?v=VtKbiyyVZks" }
+      ],
+      malayalam: [
+        { name: "NCS - Different Heaven - Nekozilla", url: "https://www.youtube.com/watch?v=6FNHe3kf8_s" },
+        { name: "NCS - Kontinuum - Lost", url: "https://www.youtube.com/watch?v=89IUCmldY0M" },
+        { name: "NCS - Diviners - Savannah", url: "https://www.youtube.com/watch?v=u1I9ITfzqFs" },
+        { name: "NCS - Warptech - Hummingbird", url: "https://www.youtube.com/watch?v=MQE3DP79fD0" },
+        { name: "NCS - Jim Yosef - Eclipse", url: "https://www.youtube.com/watch?v=1WP_YJn5aeo" },
+        { name: "NCS - TheFatRat - Unity", url: "https://www.youtube.com/watch?v=n8X9_MgEdCg" },
+        { name: "NCS - Alan Walker - Spectre", url: "https://www.youtube.com/watch?v=AOeY-nDp7hI" }
+      ]
+    };
+
+    /* ==========================================
+       STATE VARIABLES
+       ========================================== */
+    var stream = null;
+    var running = false;
+    var mode = 'Relaxed';
+    var studySec = 0;
+    var timer = null;
+    var curEmo = 'Neutral';
+    var faceOn = false;
+    var modelsOk = false;
+    var focused = 0;
+    var distracted = 0;
+    var total = 0;
+    var lowStreak = 0;
+    var lastSongTime = 0;
+
+    /* ==========================================
+       SUGGESTIONS (same as C++ DecisionEngine)
+       ========================================== */
+    var tipsRelaxed = {
+      Happy:   "Continue studying! You're doing great! 😊",
+      Sad:     "Take a short break, you'll feel better 🎵",
+      Angry:   "Relax and calm down, then continue 🧘",
+      Neutral: "Keep going, you're on track! 📚",
+      Sleepy:  "Take some rest, sleep is important ☕"
+    };
+    var tipsStrict = {
+      Happy:   "Channel that energy — hardest topic now! 💪",
+      Sad:     "WARNING: You look sad! Take a break NOW! 🔥",
+      Angry:   "ALERT: Calm down immediately! ⚡",
+      Neutral: "Stay locked in. No distractions! 🎯",
+      Sleepy:  "DANGER: You are sleepy! Rest NOW! 🚿"
+    };
+
+    /* ==========================================
+       LOAD AI MODELS
+       ========================================== */
+    async function loadModels() {
+      var url = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+      document.getElementById('loadStatus').textContent = '(Loading AI models...)';
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(url),
+          faceapi.nets.faceExpressionNet.loadFromUri(url)
+        ]);
+        modelsOk = true;
+        document.getElementById('loadStatus').textContent = '(Models ready ✓)';
+        setTimeout(function() { document.getElementById('loadStatus').textContent = ''; }, 2000);
+      } catch(e) {
+        document.getElementById('loadStatus').textContent = '(Model load failed)';
+      }
+    }
+
+    /* ==========================================
+       MODE CHANGE (dropdown)
+       ========================================== */
+    function changeMode() {
+      mode = document.getElementById('modeSelect').value;
+      document.getElementById('modeDisp').textContent = mode;
+      if (running && faceOn) {
+        var tips = (mode === 'Strict') ? tipsStrict : tipsRelaxed;
+        document.getElementById('sugDisp').textContent = tips[curEmo] || tips['Neutral'];
+      }
+      console.log('Mode changed to: ' + mode);
+    }
+
+    /* ==========================================
+       START CAMERA
+       ========================================== */
+    async function startCamera() {
+      var btn = document.getElementById('btnStart');
+      btn.textContent = '⏳ Loading...';
+      btn.disabled = true;
+
+      if (!modelsOk) await loadModels();
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width:640, height:480, facingMode:'user' }
+        });
+        var vid = document.getElementById('webcam');
+        vid.srcObject = stream;
+        vid.style.display = 'block';
+        document.getElementById('placeholder').style.display = 'none';
+        btn.style.display = 'none';
+        btn.textContent = '▶ Start Camera';
+        btn.disabled = false;
+        document.getElementById('btnStop').style.display = 'inline-block';
+        document.getElementById('liveDot').classList.add('on');
+
+        // Reset state
+        running = true;
+        studySec = 0; focused = 0; distracted = 0; total = 0;
+        faceOn = false; lowStreak = 0; curEmo = 'Neutral'; lastSongTime = 0;
+        document.getElementById('emoLog').innerHTML = '';
+        document.getElementById('emoDisp').textContent = '—';
+        document.getElementById('scoreDisp').textContent = '0.0%';
+        document.getElementById('timeDisp').textContent = '0s';
+        document.getElementById('focDisp').textContent = '0';
+        document.getElementById('disDisp').textContent = '0';
+        document.getElementById('confDisp').textContent = '';
+        document.getElementById('songBox').style.display = 'none';
+
+        vid.onloadedmetadata = function() {
+          var c = document.getElementById('overlay');
+          c.width = vid.videoWidth;
+          c.height = vid.videoHeight;
+          detectLoop();
+        };
+
+        // Timer: only counts when face is present
+        timer = setInterval(function() {
+          if (!running) return;
+          if (faceOn) studySec++;
+          var m = Math.floor(studySec / 60);
+          var s = studySec % 60;
+          document.getElementById('timeDisp').textContent = m > 0 ? m+'m '+s+'s' : s+'s';
+        }, 1000);
+
+      } catch(err) {
+        btn.textContent = '▶ Start Camera';
+        btn.disabled = false;
+        alert('Could not access webcam: ' + err.message);
+      }
+    }
+
+    /* ==========================================
+       STOP CAMERA + SESSION SUMMARY
+       ========================================== */
+    function stopCamera() {
+      if (!running) return;
+      running = false;
+      if (stream) { stream.getTracks().forEach(function(t){t.stop();}); stream = null; }
+      clearInterval(timer);
+
+      var vid = document.getElementById('webcam');
+      vid.srcObject = null;
+      vid.style.display = 'none';
+      document.getElementById('placeholder').style.display = 'block';
+      document.getElementById('btnStart').style.display = 'inline-block';
+      document.getElementById('btnStop').style.display = 'none';
+      document.getElementById('liveDot').classList.remove('on');
+      document.getElementById('warnBox').style.display = 'none';
+      document.getElementById('beepBox').style.display = 'none';
+      document.getElementById('songBox').style.display = 'none';
+      document.getElementById('songPopup').style.display = 'none';
+      var c = document.getElementById('overlay');
+      c.getContext('2d').clearRect(0, 0, c.width, c.height);
+
+      showSummary();
+    }
+
+    function showSummary() {
+      if (total === 0 && studySec === 0) return;
+      var sc = total > 0 ? ((focused/total)*100).toFixed(1) : '0.0';
+      var m = Math.floor(studySec/60), s = studySec%60;
+      var t = m > 0 ? m+'m '+s+'s' : s+'s';
+
+      document.getElementById('summaryBody').innerHTML =
+        '<div style="background:var(--code);border-radius:8px;padding:14px;font-family:JetBrains Mono,monospace;font-size:.78rem;line-height:2;text-align:left;">' +
+        '<div style="color:var(--dim);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px;">======= SESSION SUMMARY =======</div>' +
+        '<div>Focused (Happy/Neutral): <span style="color:var(--green);font-weight:700;">'+focused+'</span></div>' +
+        '<div>Distracted (Sad/Angry/Sleepy): <span style="color:var(--red);font-weight:700;">'+distracted+'</span></div>' +
+        '<div>Total readings: <span style="color:var(--accent);">'+total+'</span></div>' +
+        '<div>Productivity: <span style="color:var(--green);font-weight:700;">'+sc+'%</span></div>' +
+        '<div>Study Time: <span style="color:var(--accent);font-weight:700;">'+t+'</span></div>' +
+        '<div style="color:var(--dim);border-top:1px solid var(--border);padding-top:6px;margin-top:6px;">===============================</div></div>';
+
+      document.getElementById('summaryModal').style.display = 'flex';
+
+      // Console log (like C++ printSummary)
+      console.log('========================================');
+      console.log('       SESSION SUMMARY');
+      console.log('Focused:', focused, '| Distracted:', distracted);
+      console.log('Productivity:', sc + '%', '| Time:', t);
+      console.log('========================================');
+    }
+
+    function closeSummary() {
+      document.getElementById('summaryModal').style.display = 'none';
+    }
+
+    /* ==========================================
+       SONG RECOMMENDATION
+       ========================================== */
+    var songTimer = null;
+    var songCountInterval = null;
+    var songSecsLeft = 0;
+
+    function hideSongPopups() {
+      document.getElementById('songBox').style.display = 'none';
+      document.getElementById('songPopup').style.display = 'none';
+    }
+
+    function clearSongTimers() {
+      if (songTimer) { clearTimeout(songTimer); songTimer = null; }
+      if (songCountInterval) { clearInterval(songCountInterval); songCountInterval = null; }
+    }
+
+    function recommendSong(emotion) {
+      if (emotion !== 'Sad' && emotion !== 'Angry') {
+        // Don't hide if timer is still active (10s window)
+        return;
+      }
+
+      // If already showing a song, don't change it until timer expires
+      if (songTimer) return;
+
+      var lang = document.getElementById('langSelect').value;
+      var list = songs[lang];
+      var pick = list[Math.floor(Math.random() * list.length)];
+
+      // Update in-video overlay
+      document.getElementById('songName').textContent = pick.name;
+      document.getElementById('songLink').href = pick.url;
+      document.getElementById('songBox').style.display = 'block';
+
+      // Update popup below video
+      document.getElementById('songPopupName').textContent = pick.name;
+      document.getElementById('songPopupLink').href = pick.url;
+      document.getElementById('songPopup').style.display = 'block';
+
+      // Countdown
+      songSecsLeft = 10;
+      document.getElementById('countSec').textContent = songSecsLeft;
+
+      songCountInterval = setInterval(function() {
+        songSecsLeft--;
+        if (songSecsLeft < 0) songSecsLeft = 0;
+        document.getElementById('countSec').textContent = songSecsLeft;
+      }, 1000);
+
+      // Hide after 10 seconds
+      songTimer = setTimeout(function() {
+        clearSongTimers();
+        hideSongPopups();
+      }, 10000);
+    }
+
+    /* ==========================================
+       FACE DETECTION LOOP
+       ========================================== */
+    async function detectLoop() {
+      if (!running) return;
+
+      var vid = document.getElementById('webcam');
+      var can = document.getElementById('overlay');
+      var ctx = can.getContext('2d');
+      ctx.clearRect(0, 0, can.width, can.height);
+
+      if (modelsOk && vid.readyState >= 2) {
+        try {
+          var dets = await faceapi
+            .detectAllFaces(vid, new faceapi.TinyFaceDetectorOptions({ inputSize:320, scoreThreshold:0.3 }))
+            .withFaceExpressions();
+
+          if (dets.length > 0) {
+            faceOn = true;
+            lowStreak = 0;
+            document.getElementById('warnBox').style.display = 'none';
+
+            var d = dets[0];
+            var b = d.detection.box;
+            var mx = can.width - b.x - b.width;
+
+            // Green rectangle around face
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(mx, b.y, b.width, b.height);
+
+            // Find top expression
+            var ex = d.expressions;
+            var topName = 'neutral', topVal = 0;
+            for (var k in ex) {
+              if (ex[k] > topVal) { topVal = ex[k]; topName = k; }
+            }
+
+            // Map to our 5 emotions
+            var emap = { happy:'Happy', sad:'Sad', angry:'Angry', neutral:'Neutral', surprised:'Happy', fearful:'Sad', disgusted:'Angry' };
+            var newEmo = emap[topName] || 'Neutral';
+
+            // Sleepy detection: low confidence neutral for several frames
+            if (topVal < 0.4 && topName === 'neutral') {
+              lowStreak++;
+              if (lowStreak > 5) newEmo = 'Sleepy';
+            } else {
+              lowStreak = Math.max(0, lowStreak - 2);
+            }
+
+            // Update only on change
+            if (newEmo !== curEmo) {
+              curEmo = newEmo;
+              total++;
+
+              if (curEmo === 'Happy' || curEmo === 'Neutral') { focused++; }
+              else { distracted++; }
+
+              document.getElementById('emoDisp').textContent = curEmo;
+              document.getElementById('focDisp').textContent = focused;
+              document.getElementById('disDisp').textContent = distracted;
+
+              var tips = (mode === 'Strict') ? tipsStrict : tipsRelaxed;
+              document.getElementById('sugDisp').textContent = tips[curEmo];
+
+              // BEEP for Sleepy or Angry
+              if (curEmo === 'Sleepy' || curEmo === 'Angry') {
+                doBeep(curEmo);
+              }
+
+              // Song recommendation for Sad or Angry
+              recommendSong(curEmo);
+
+              // Emotion log
+              var li = document.createElement('li');
+              li.textContent = new Date().toLocaleTimeString() + ' → ' + curEmo;
+              var log = document.getElementById('emoLog');
+              log.insertBefore(li, log.firstChild);
+              if (log.children.length > 25) log.removeChild(log.lastChild);
+
+              // Score
+              if (total > 0) {
+                document.getElementById('scoreDisp').textContent = ((focused/total)*100).toFixed(1) + '%';
+              }
+            }
+
+            // Song hiding is handled by the 10s timer in recommendSong()
+
+            // Confidence text
+            var conf = Math.round(topVal * 100);
+            document.getElementById('confDisp').textContent = topName + ' ' + conf + '%';
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 15px JetBrains Mono, monospace';
+            ctx.fillText(curEmo + ' (' + conf + '%)', mx, b.y - 8);
+
+          } else {
+            // No face
+            faceOn = false;
+            document.getElementById('warnBox').style.display = 'block';
+            document.getElementById('emoDisp').textContent = '—';
+            document.getElementById('confDisp').textContent = 'No face detected';
+            // Song hiding is handled by the 10s timer in recommendSong()
+            lowStreak++;
+          }
+        } catch(e) {}
+      }
+
+      setTimeout(function() { requestAnimationFrame(detectLoop); }, 120);
+    }
+
+    /* ==========================================
+       BEEP ALERT (like C++ cout BEEP)
+       ========================================== */
+    function doBeep(emo) {
+      console.log('BEEP! Alert: You are ' + emo + '!');
+      var el = document.getElementById('beepBox');
+      el.textContent = '🔔 BEEP! You are ' + emo + '!';
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 2500);
+
+      try {
+        var a = new (window.AudioContext || window.webkitAudioContext)();
+        var o = a.createOscillator();
+        var g = a.createGain();
+        o.connect(g); g.connect(a.destination);
+        o.frequency.value = (emo === 'Sleepy') ? 440 : 660;
+        g.gain.value = 0.25;
+        o.start(); o.stop(a.currentTime + 0.2);
+      } catch(e) {}
+    }
+
+    /* ==========================================
+       KEYBOARD SHORTCUTS (like C++ waitKey)
+       ========================================== */
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'q' || e.key === 'Q') stopCamera();
+      if (e.key === 'm' || e.key === 'M') {
+        var sel = document.getElementById('modeSelect');
+        sel.value = (sel.value === 'Relaxed') ? 'Strict' : 'Relaxed';
+        changeMode();
+      }
+    });
+  </script>
+
+</body>
+</html>
